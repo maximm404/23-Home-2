@@ -1,217 +1,430 @@
+#include <functional>
 #include <iostream>
 #include <fstream>
-#include <vector>
+#include <cstring>
+#include <sstream>
 #include <stdexcept>
 
+using namespace std;
+
+template<typename T>
 class Matrix {
 private:
-    int str;
-    int stl;
-    std::vector<std::vector<double>> data;
+    long int rows;
+    long int cols;
+    T** arr;
 
 public:
-    // Конструктор
-    Matrix(int str, int stl) : str(str), stl(stl) {
-        data.resize(str, std::vector<double>(stl, 0));
-    }
+    Matrix() : rows(0), cols(0), arr(nullptr) {}
 
-    // Деструктор
-    ~Matrix() {}
-
-    // Метод для ввода матрицы с консоли
-    void vvod() {
-        std::cout << "Matrix : \n";
-        for (int i = 0; i < str; ++i) {
-            for (int j = 0; j < stl; ++j) {
-                std::cout << "element [" << i + 1 << "," << j + 1 << "] ";
-                std::cin >> data[i][j];
+    Matrix(long int m, long int n) {
+        rows = m;
+        cols = n;
+        arr = new T * [rows];
+        for (unsigned int i = 0; i < rows; ++i) {
+            arr[i] = new T[cols];
+            for (unsigned int j = 0; j < cols; ++j) {
+                arr[i][j] = 0;
             }
         }
     }
 
-    // Метод для вывода матрицы на консоль
-    void vivod() const {
-        for (int i = 0; i < str; ++i) {
-            for (int j = 0; j < stl; ++j) {
-                std::cout << data[i][j] << " ";
-            }
-            std::cout << std::endl;
-        }
-    }
-
-    // Метод для записи матрицы в файл
-    void tofile(const char* filename) const {
-        std::ofstream file("qwerty.txt");
+    explicit Matrix(const char* filename) : rows(0), cols(0), arr(nullptr) {
+        std::ifstream file(filename);
         if (!file) {
-            std::cerr << "Error";
-            return;
+            throw std::runtime_error("Error");
         }
-
-        file << str << " " << stl << std::endl;
-        for (int i = 0; i < str; ++i) {
-            for (int j = 0; j < stl; ++j) {
-                file << data[i][j] << " ";
+        std::string line;
+        int i = 0;
+        int rows_tmp = 0;
+        int cols_tmp = 0;
+        while (std::getline(file, line)) {
+            if (i == 0) {
+                std::stringstream ss(line);
+                ss >> rows_tmp;
+                ss.ignore(1, ',');
+                ss >> cols_tmp;
+                if (cols_tmp > 0 && rows_tmp > 0) {
+                    rows = rows_tmp;
+                    cols = cols_tmp;
+                    arr = new T * [rows];
+                    for (unsigned int l = 0; l < rows; ++l) {
+                        arr[l] = new T[cols];
+                    }
+                }
+                else {
+                    throw std::out_of_range("Error");
+                }
             }
-            file << std::endl;
+            else {
+                std::stringstream ss(line);
+                for (unsigned int j = 0; j < cols_tmp; j++) {
+                    T value;
+                    ss >> value;
+                    ss.ignore(1, ',');
+                    arr[i - 1][j] = value;
+                }
+            }
+            i += 1;
         }
-
         file.close();
     }
 
-    // Метод для считывания матрицы из файла
-    void fromfile(const char* filename) {
-        std::ifstream file("qwerty.txt");
-        if (file.is_open()) {
-            file >> str >> stl;
-            data.resize(str, std::vector<double>(stl, 0));
-            for (int i = 0; i < str; ++i) {
-                for (int j = 0; j < stl; ++j) {
-                    file >> data[i][j];
+    Matrix(const Matrix& second) {
+        rows = second.rows;
+        cols = second.cols;
+        arr = new T * [rows];
+        for (unsigned int i = 0; i < rows; ++i) {
+            arr[i] = new T[cols];
+            for (unsigned int j = 0; j < cols; ++j) {
+                arr[i][j] = second.arr[i][j];
+            }
+        }
+    }
+
+    Matrix(Matrix&& second) noexcept {
+        rows = second.rows;
+        cols = second.cols;
+        arr = second.arr;
+        second.arr = nullptr;
+    }
+
+    ~Matrix() {
+        for (unsigned int i = 0; i < rows; ++i) {
+            delete[] arr[i];
+        }
+        delete[] arr;
+    }
+
+    void initialize() {
+        for (unsigned int i = 0; i < rows; ++i) {
+            for (unsigned int j = 0; j < cols; ++j) {
+                std::cin >> arr[i][j];
+            }
+        }
+    }
+
+    static Matrix<T> one(long int n) {
+        Matrix<T> result(n, n);
+        for (unsigned int i = 0; i < n; ++i) {
+            for (unsigned int j = 0; j < n; ++j) {
+                if (i == j) {
+                    result.arr[i][j] = 1;
                 }
+                else {
+                    result.arr[i][j] = 0;
+                }
+            }
+        }
+        return result;
+    }
+
+    static Matrix<T> zero(long int m, long int n) {
+        Matrix<T> result(m, n);
+        for (unsigned int i = 0; i < m; ++i) {
+            for (unsigned int j = 0; j < n; ++j) {
+                result.arr[i][j] = 0;
+            }
+        }
+        return result;
+    }
+
+    T getElement(long int i, long int j) const {
+        if (i < rows && j < cols && i >= 0 && j >= 0) {
+            return arr[i][j];
+        }
+        else {
+            throw std::out_of_range("Error");
+        }
+    }
+
+    T getDeterminant() {
+        T sum = 0;
+        if (rows == cols) {
+            if (rows == 1) {
+                return arr[0][0];
+            }
+            else if (rows == 2) {
+                return arr[0][0] * arr[1][1] - arr[1][0] * arr[0][1];
+            }
+            else {
+                for (unsigned int j = 0; j < cols; j++) {
+                    sum += (j % 2 == 0 ? 1 : -1) * arr[0][j] * makeMinor(0, j).getDeterminant();
+                }
+            }
+        }
+        else {
+            throw std::runtime_error("Error");
+        }
+        return sum;
+    }
+
+    void print() const {
+        if (rows > 0 && cols > 0) {
+            for (unsigned int i = 0; i < rows; ++i) {
+                std::cout << "[";
+                for (unsigned int j = 0; j < cols; ++j) {
+                    std::cout << getElement(i, j) << " ";
+                }
+                std::cout << "]\n";
+            }
+        }
+    }
+
+    void readFile() {
+        Matrix<T> tmp("text.txt");
+        *this = tmp;
+    }
+
+    void writeFile() {
+        std::ofstream file("text.txt");
+        if (file.is_open()) {
+            file << rows << "," << cols << "," << std::endl;
+            for (unsigned int i = 0; i < rows; i++) {
+                for (unsigned int j = 0; j < cols; j++) {
+                    file << arr[i][j] << ",";
+                }
+                file << std::endl;
             }
             file.close();
         }
         else {
-            std::cout << "Unable to open file";
+            throw std::runtime_error("Error");
         }
     }
 
-    // Перегрузка оператора присваивания
-    Matrix& operator=(const Matrix& other) {
-        if (this == &other) return *this; // Самоприсваивание
+    Matrix& operator=(const Matrix& second) {
+        if (this != &second) {
+            for (unsigned int i = 0; i < rows; ++i)
+                delete[] arr[i];
+            delete[] arr;
 
-        str = other.str;
-        stl = other.stl;
-        data = other.data;
-
-        return *this;
-    }
-
-    // Перегрузка оператора вывода для вывода матрицы
-    friend std::ostream& operator<<(std::ostream& os, const Matrix& matrix) {
-        for (int i = 0; i < matrix.str; ++i) {
-            for (int j = 0; j < matrix.stl; ++j) {
-                os << matrix.data[i][j] << " ";
-            }
-            os << std::endl;
-        }
-        return os;
-    }
-
-    // Статический метод для создания нулевой матрицы указанного размера
-    static Matrix zeros(int str, int stl) {
-        return Matrix(str, stl);
-    }
-
-    // Статический метод для создания единичной матрицы указанного размера
-    static Matrix identity(int size) {
-        Matrix identityMatrix(size, size);
-        for (int i = 0; i < size; ++i) {
-            identityMatrix.data[i][i] = 1;
-        }
-        return identityMatrix;
-    }
-
-    // Перегрузка оператора ! для вычисления обратной матрицы
-    Matrix operator!() const {
-        if (str != stl) {
-            throw std::invalid_argument("Матрица должна быть квадратной!");
-        }
-
-        // Пример вычисления обратной матрицы можно реализовать здесь
-        // Но в данном примере просто выбрасываем исключение, как требуется в задании
-        throw std::runtime_error("Матрица необратима");
-    }
-
-    // Перегрузка оператора сложения матриц
-    Matrix operator+(const Matrix& other) {
-        Matrix result(str, stl);
-
-        for (int i = 0; i < str; ++i) {
-            for (int j = 0; j < stl; ++j) {
-                result.data[i][j] = data[i][j] + other.data[i][j];
-            }
-        }
-
-        return result;
-    }
-
-    // Перегрузка оператора вычитания матриц
-    Matrix operator-(const Matrix& other) {
-        Matrix result(str, stl);
-
-        for (int i = 0; i < str; ++i) {
-            for (int j = 0; j < stl; ++j) {
-                result.data[i][j] = data[i][j] - other.data[i][j];
-            }
-        }
-
-        return result;
-    }
-
-    // Перегрузка оператора умножения матрицы на матрицу
-    Matrix operator*(const Matrix& other) {
-        Matrix result(str, other.stl);
-
-        for (int i = 0; i < str; ++i) {
-            for (int j = 0; j < other.stl; ++j) {
-                result.data[i][j] = 0;
-                for (int k = 0; k < stl; ++k) {
-                    result.data[i][j] += data[i][k] * other.data[k][j];
+            rows = second.rows;
+            cols = second.cols;
+            arr = new T * [rows];
+            for (unsigned int i = 0; i < rows; ++i) {
+                arr[i] = new T[cols];
+                for (unsigned int j = 0; j < cols; ++j) {
+                    arr[i][j] = second.arr[i][j];
                 }
             }
         }
+        return *this;
+    }
 
+    Matrix operator+(const Matrix& second) const {
+        if (rows == second.rows && cols == second.cols) {
+            Matrix result(rows, cols);
+            for (unsigned int i = 0; i < rows; ++i) {
+                for (unsigned int j = 0; j < cols; ++j) {
+                    result.arr[i][j] = arr[i][j] + second.arr[i][j];
+                }
+            }
+            return result;
+        }
+        else {
+            throw std::invalid_argument("Matrices dimensions do not match for addition");
+        }
+    }
+
+    Matrix operator-(const Matrix& second) const {
+        if (rows == second.rows && cols == second.cols) {
+            Matrix result(rows, cols);
+            for (unsigned int i = 0; i < rows; ++i) {
+                for (unsigned int j = 0; j < cols; ++j) {
+                    result.arr[i][j] = arr[i][j] - second.arr[i][j];
+                }
+            }
+            return result;
+        }
+        else {
+            throw std::invalid_argument("Matrices dimensions do not match for subtraction");
+        }
+    }
+
+    Matrix operator*(const Matrix& second) const {
+        if (cols == second.rows) {
+            Matrix result(rows, second.cols);
+            for (unsigned int i = 0; i < rows; ++i) {
+                for (unsigned int j = 0; j < second.cols; ++j) {
+                    result.arr[i][j] = 0;
+                    for (unsigned int k = 0; k < cols; ++k) {
+                        result.arr[i][j] += arr[i][k] * second.arr[k][j];
+                    }
+                }
+            }
+            return result;
+        }
+        else {
+            throw std::invalid_argument("Matrices dimensions do not match for multiplication");
+        }
+    }
+
+    Matrix operator*(T factor) const {
+        Matrix result(rows, cols);
+        for (unsigned int i = 0; i < rows; ++i) {
+            for (unsigned int j = 0; j < cols; ++j) {
+                result.arr[i][j] = arr[i][j] * factor;
+            }
+        }
         return result;
     }
 
-    // Перегрузка оператора умножения матрицы на скаляр
-    Matrix operator*(const int scalar) {
-        Matrix result(str, stl);
+    Matrix& operator*=(const Matrix& second) {
+        *this = *this * second;
+        return *this;
+    }
 
-        for (int i = 0; i < str; ++i) {
-            for (int j = 0; j < stl; ++j) {
-                result.data[i][j] = data[i][j] * scalar;
+    Matrix& operator*=(T factor) {
+        for (unsigned int i = 0; i < rows; ++i) {
+            for (unsigned int j = 0; j < cols; ++j) {
+                arr[i][j] *= factor;
             }
         }
+        return *this;
+    }
 
-        return result;
+    Matrix& operator+=(const Matrix& second) {
+        if (rows == second.rows && cols == second.cols) {
+            for (unsigned int i = 0; i < rows; ++i) {
+                for (unsigned int j = 0; j < cols; ++j) {
+                    arr[i][j] += second.arr[i][j];
+                }
+            }
+        }
+        else {
+            throw std::invalid_argument("Matrices dimensions do not match for addition");
+        }
+        return *this;
+    }
+
+    bool operator==(const Matrix& second) const {
+        if (rows == second.rows && cols == second.cols) {
+            for (unsigned int i = 0; i < rows; ++i) {
+                for (unsigned int j = 0; j < cols; ++j) {
+                    if (arr[i][j] != second.arr[i][j]) {
+                        return false;
+                    }
+                }
+            }
+            return true;
+        }
+        return false;
+    }
+
+    bool operator!=(const Matrix& second) const {
+        return !(*this == second);
+    }
+
+    bool operator==(T scalar) const {
+        for (unsigned int i = 0; i < rows; ++i) {
+            for (unsigned int j = 0; j < cols; ++j) {
+                if (arr[i][j] != scalar) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    bool operator!=(T scalar) const {
+        return !(*this == scalar);
+    }
+
+    Matrix& operator!() {
+        T det = this->getDeterminant();
+        if (det != 0) {
+            Matrix adj = this->makeAdjoint();
+            for (unsigned int i = 0; i < rows; ++i) {
+                for (unsigned int j = 0; j < cols; ++j) {
+                    this->arr[i][j] = adj.arr[i][j] / det;
+                }
+            }
+        }
+        else {
+            throw std::runtime_error("Matrix is singular, cannot find its inverse");
+        }
+        return *this;
+    }
+
+private:
+    void SwapElements(long int i, long int j) {
+        T temp = arr[i][j];
+        arr[i][j] = arr[j][i];
+        arr[j][i] = temp;
+    }
+
+    void swapLines(long int i1, long int i2) {
+        T* temp = arr[i1];
+        arr[i1] = arr[i2];
+        arr[i2] = temp;
+    }
+
+    void dif2(const T* a) {
+        unsigned int k = 0;
+        for (unsigned int i = 0; i < rows; ++i) {
+            for (unsigned int j = 0; j < cols; ++j) {
+                arr[i][j] = a[k];
+                k += 1;
+            }
+        }
+    }
+
+    void transp() {
+        if (rows == cols) {
+            for (unsigned int i = 0; i < rows; ++i) {
+                for (unsigned int j = i; j < cols; ++j) {
+                    if (j != i)
+                        this->SwapElements(i, j);
+                }
+            }
+        }
+        else {
+            throw std::invalid_argument("Matrix must be square to transpose");
+        }
+    }
+
+    Matrix makeAdjoint() const {
+        Matrix adjoint(rows, cols);
+        for (unsigned int i = 0; i < rows; ++i) {
+            for (unsigned int j = 0; j < cols; ++j) {
+                adjoint.arr[i][j] = ((i + j) % 2 == 0 ? 1 : -1) * makeMinor(i, j).getDeterminant();
+            }
+        }
+        adjoint.transp();
+        return adjoint;
+    }
+
+    Matrix makeMinor(long int i, long int j) const {
+        Matrix minor(rows - 1, cols - 1);
+        int minor_i = 0;
+        for (unsigned int r = 0; r < rows; ++r) {
+            if (r == i) continue;
+            int minor_j = 0;
+            for (unsigned int c = 0; c < cols; ++c) {
+                if (c == j) continue;
+                minor.arr[minor_i][minor_j] = arr[r][c];
+                minor_j++;
+            }
+            minor_i++;
+        }
+        return minor;
     }
 };
 
 int main() {
-    // Пример использования
+    cout << boolalpha;
+    Matrix<float> Matrix1(2, 2);
+    Matrix1.initialize();
+    Matrix<float> Matrix2(2, 2);
+    Matrix2.initialize();
 
-    // Создание матрицы 3x3 и заполнение ее элементами
-    Matrix mat(3, 3);
-    mat.vvod();
+    Matrix<float> MatrixSum = Matrix1 + Matrix2;
+    MatrixSum.print();
 
-    // Вывод матрицы
-    std::cout << "Original Matrix:\n";
-    std::cout << mat;
-
-    try {
-        // Вычисление обратной матрицы
-        Matrix inverse = !mat;
-    }
-    catch (const std::invalid_argument& e) {
-        std::cerr << "Error: " << e.what() << std::endl;
-    }
-    catch (const std::runtime_error& e) {
-        std::cerr << "Error: " << e.what() << std::endl;
-    }
-
-    // Создание нулевой и единичной матриц
-    Matrix zeroMatrix = Matrix::zeros(3, 3);
-    Matrix identityMatrix = Matrix::identity(3);
-
-    std::cout << "Zero Matrix:\n";
-    std::cout << zeroMatrix;
-
-    std::cout << "Identity Matrix:\n";
-    std::cout << identityMatrix;
-
+    cout << Matrix1.getDeterminant() << endl;
+    !Matrix1;
+    Matrix1.print();
     return 0;
 }
-
-
+ 
